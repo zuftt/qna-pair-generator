@@ -1,143 +1,78 @@
 # qna-pair-generator
 
-# QnA Pair Generator (Bahasa Melayu)
+## QnA Pair Generator (Bahasa Melayu)
 
-A Python CLI tool that generates non-redundant Question-Answer pairs in Bahasa Melayu from text files using a two-agent system. Agent 1 (Penjana/Generator) creates Q&A candidates, and Agent 2 (Penyemak/Reviewer) verifies, edits, or rejects each pair to ensure quality and accuracy.
+Minimal instructions to get running locally with **Qwen: `qwen/qwen3-next-80b-a3b-instruct`** — **Web UI only (no CLI)**.
 
-## Features
+---
 
-- **Two-Agent System**: Generator creates candidates, Reviewer validates quality
-- **OpenAI-Compatible APIs**: Works with OpenRouter, DashScope, or any OpenAI-compatible endpoint
-- **Smart Chunking**: Configurable word-window chunking with overlap
-- **Deduplication**: Fuzzy matching to eliminate near-duplicate questions
-- **Strict JSONL Output**: Clean, parseable output format
-- **Configurable**: Environment variables for all key parameters
-
-## Setup
-
-1. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. **Configure API Access**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API credentials
-   ```
-
-   **Option A: OpenRouter (Recommended - Free Tier Available)**
-   - Sign up at [OpenRouter](https://openrouter.ai/)
-   - Get your API key
-   - Use these settings in `.env`:
-     ```
-     OPENAI_API_KEY=your_openrouter_api_key_here
-     OPENAI_BASE_URL=https://openrouter.ai/api/v1
-     QWEN_GEN_MODEL=qwen/qwen3-next-80b-a3b-instruct
-     QWEN_REVIEW_MODEL=qwen/qwen3-next-80b-a3b-instruct
-     ```
-
-   **Option B: DashScope (Alibaba Cloud)**
-   - Sign up at [DashScope](https://dashscope.aliyun.com/)
-   - Get your API key
-   - Use these settings in `.env`:
-     ```
-     OPENAI_API_KEY=your_dashscope_api_key_here
-     OPENAI_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
-     QWEN_GEN_MODEL=qwen-plus
-     QWEN_REVIEW_MODEL=qwen-plus
-     ```
-
-3. **Prepare Input Files**
-   - For CLI: Place your `.txt` files in the `./data/` directory
-   - For GUI: You can select any text file directly
-   - A sample file `data/sample.txt` is included for testing
-
-## Usage
-
-### 🌐 Web Interface (Recommended - Browser-Based)
-
-Launch the web application:
+## 1) Set Up
 ```bash
-python3 qna_bm_web.py
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
 ```
-
-Then open your browser and navigate to: **http://localhost:8080**
-
-The web interface provides:
-- ✅ **Live Progress Updates** - Real-time streaming progress as Q&A pairs are generated
-- ✅ **AI Connection Verification** - Automatic check to ensure API is connected before starting
-- ✅ **File Upload** - Upload any text file via drag & drop or file browser
-- ✅ **Configurable Settings** - Adjust maximum number of Q&A pairs
-- ✅ **Beautiful Preview** - View generated Q&A pairs in a clean, organized interface
-- ✅ **One-Click CSV Export** - Download results as CSV file instantly
-- ✅ **Cross-Platform** - Works on any device with a modern browser
-
-### 💻 CLI Interface
-
-For batch processing multiple files:
+Edit **.env** (OpenRouter recommended):
+```dotenv
+OPENAI_API_KEY=YOUR_OPENROUTER_KEY
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+QWEN_GEN_MODEL=qwen/qwen3-next-80b-a3b-instruct
+QWEN_REVIEW_MODEL=qwen/qwen3-next-80b-a3b-instruct
+```
+Add your source files:
 ```bash
-python qna_bm_two_agent.py
+mkdir -p data
+# put your .txt files into ./data/
 ```
 
-The script will:
-1. Read all `.txt` files from `./data/*.txt`
-2. Chunk each file into overlapping segments
-3. Generate Q&A pairs using Agent 1 (Penjana)
-4. Review each pair using Agent 2 (Penyemak)
-5. Filter out duplicates
-6. Write results to `qa_bm.jsonl`
+---
 
-## Environment Variables
+## 2) Use on Localhost
+### Web UI
+```bash
+python qna_bm_web.py
+```
+Open **http://localhost:8080** then:
+1. Upload your `.txt` files (drag & drop or file picker).
+2. Click **Generate** to create Q&A pairs.
+3. Preview results, then **Download** (CSV/JSONL).
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | *required* | Your API key |
-| `OPENAI_BASE_URL` | *required* | API endpoint URL |
-| `QWEN_GEN_MODEL` | `qwen/qwen3-next-80b-a3b-instruct` | Model for generator agent |
-| `QWEN_REVIEW_MODEL` | `qwen/qwen3-next-80b-a3b-instruct` | Model for reviewer agent |
-| `QNA_CHUNK_WORDS` | `800` | Words per chunk |
-| `QNA_CHUNK_OVERLAP` | `100` | Overlapping words between chunks |
-| `QNA_DUP_QUESTION_SIM` | `0.88` | Similarity threshold for duplicate detection (0-1) |
-| `QNA_MAX_PAIRS` | `100` | Maximum Q&A pairs to generate |
-| `QNA_INPUT_GLOB` | `data/*.txt` | Input file pattern |
-| `QNA_OUTPUT_PATH` | `qa_bm.jsonl` | Output file path |
+---
 
-## Output Format
+## Notes
+- No tuning needed—defaults use the specified Qwen model for both Generator and Reviewer.
+- If you prefer DashScope later, just replace `OPENAI_BASE_URL` and keep the same model or `qwen-plus`.
 
-The output file `qa_bm.jsonl` contains one JSON object per line:
-```json
-{"question":"Apakah ibu negara Malaysia?","answer":"Kuala Lumpur","source":"sample.txt"}
-{"question":"Berapa banyak negeri di Malaysia?","answer":"Tiga belas negeri","source":"sample.txt"}
+---
+
+## Three-Stage AI System Architecture
+
+This system uses a sophisticated three-stage pipeline to ensure high-quality, metadata-free Q&A pairs:
+
+### Stage 1: Pre-filter (Penyaring Awal)
+- **Purpose**: Filters out chunks containing metadata or inappropriate content
+- **Checks for**: File metadata, system information, non-Malay content, text length
+- **Output**: Accepts or rejects text chunks before processing
+
+### Stage 2: Generator (Penjana)
+- **Purpose**: Generates Q&A pair candidates from validated text chunks
+- **Capabilities**: Creates up to 10 Q&A pairs per chunk across various difficulty levels
+- **Format**: Strict JSONL output with question, answer, and source
+- **Language**: Bahasa Melayu baku (standard Malay)
+
+### Stage 3: Reviewer (Penyemak)
+- **Purpose**: Verifies and filters generated Q&A pairs for quality and accuracy
+- **Filters out**: Metadata (author names, journals, emails, references), low-quality pairs
+- **Actions**: Accept, edit (auto-correct), or reject pairs
+- **Ensures**: Content is supported by source text, no metadata leakage
+
+### Processing Flow
+```
+Input Text → [Pre-filter] → Valid Chunks → [Generator] → Q&A Candidates → [Reviewer] → Final Q&A Pairs → CSV Output
 ```
 
-## How It Works
-
-1. **Chunking**: Text files are split into overlapping chunks (default: 800 words, 100 overlap)
-2. **Generation**: For each chunk, Agent 1 generates up to 10 Q&A pair candidates in Bahasa Melayu
-3. **Review**: Agent 2 reviews each candidate and returns:
-   - `accept`: Pair is good as-is
-   - `edit`: Pair needs corrections (auto-corrected)
-   - `reject`: Pair doesn't meet quality standards
-4. **Deduplication**: Accepted pairs are checked against existing questions using fuzzy matching
-5. **Output**: Final pairs are written to JSONL format
-
-## Troubleshooting
-
-- **"Error: OPENAI_API_KEY and OPENAI_BASE_URL must be set"**
-  - Check your `.env` file exists and contains the required variables
-  - Ensure you've copied `.env.example` to `.env` and filled in your credentials
-
-- **"No files found matching data/*.txt"**
-  - Create a `data/` directory and add `.txt` files to it
-  - Or modify `QNA_INPUT_GLOB` environment variable
-
-- **API Errors**
-  - Verify your API key is correct
-  - Check that your chosen model is available
-  - For OpenRouter free tier, ensure you're using the correct model names
-
-## License
-
-MIT License - feel free to use and modify as needed.
-
+### Performance Optimizations
+- **Parallel Processing**: Processes multiple chunks simultaneously (configurable workers)
+- **Skip Review Mode**: Fast mode that skips AI review but includes basic metadata filtering
+- **Smart Deduplication**: Fuzzy matching to prevent near-duplicate questions
+- **Metadata Stripping**: Automatically removes file headers and metadata before processing 

@@ -1,0 +1,11 @@
+Anda akan menerima TEKS PENUH sebuah dokumen yang mengandungi metadata (contoh: ID Fail, Tajuk, Penulis/Author/Afiliasi, Tarikh, Kata kunci/Keywords, ABSTRAK/ABSTRACT, maklumat jurnal, E-mel, RUJUKAN/References/Bibliografi, nota editorial, biodata penulis, header/footer halaman). Tugas anda: EKSTRAK dan pulangkan hanya kandungan utama artikel untuk penjanaan Soal–Jawab.
+
+Peraturan penapisan:
+- Ambil teks daripada bahagian isi (cth: Pengenalan/Pendahuluan → Perbincangan/Hasil → Kesimpulan) serta seksyen isi lain yang relevan (metodologi, dapatan, huraian sejarah, konteks).
+- Abaikan dan JANGAN guna untuk Q&A: semua metadata di atas; senarai rujukan/bibliografi; baris bermula dengan pola berikut: ^(ID Fail|Tajuk|Penulis|Author|Tarikh|Sumber|Tahap|Bahasa|Laras|Panjang|Hak Guna|Kata kunci|Keywords|ABSTRAK|ABSTRACT|RUJUKAN|References|Bibliografi|E-mel|Email)\\b; maklumat jurnal/penerbit; biodata/afiliasi penulis; pautan.
+- Jika tiada tajuk bahagian yang jelas, anggap kandungan utama bermula selepas tajuk artikel dan berhenti sebelum senarai rujukan.
+- Buang baris yang semata-mata adalah sitasi seperti “(Nama Tahun)” jika ia tidak mengandungi fakta substantif.
+- Jangan cipta, jangan meringkaskan — hanya “salin keluar” isi yang layak.
+Format keluaran:
+TEKS_BERSIH:
+<letakkan hanya teks bersih di sini>

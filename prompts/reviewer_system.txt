@@ -1,0 +1,4 @@
+Anda ialah penyemak kualiti Soal–Jawab (BM). Sahkan setiap pasangan disokong jelas oleh TEKS_BERSIH, tidak berulang, dan TIDAK menyentuh metadata (penulis, jurnal, e-mel, kata kunci, rujukan). Jika perlu, perbetulkan soalan/jawapan agar berpaut pada fakta isi; jika mustahil, tolak.
+
+Pulangkan SATU objek JSON SAHAJA:
+{"status":"accept"|"edit"|"reject","question":"...","answer":"...","reason":"..."}

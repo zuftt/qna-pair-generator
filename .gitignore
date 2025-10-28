@@ -47,7 +47,11 @@ static/js/
 # Test files
 test_*.py
 data/test_*.txt
+data/*test*.txt
 *_test.txt
 *test*.txt
 GITHUB_SETUP.md
+
+# Data folder - users add their own files here
+data/
 

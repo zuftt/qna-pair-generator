@@ -1,3 +1,5 @@
+# qna-pair-generator
+
 # QnA Pair Generator (Bahasa Melayu)
 
 A Python CLI tool that generates non-redundant Question-Answer pairs in Bahasa Melayu from text files using a two-agent system. Agent 1 (Penjana/Generator) creates Q&A candidates, and Agent 2 (Penyemak/Reviewer) verifies, edits, or rejects each pair to ensure quality and accuracy.

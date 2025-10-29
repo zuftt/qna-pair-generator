@@ -1,7 +1,6 @@
 ## QnA Pair Generator (Bahasa Melayu)
 
-A Python web application that automatically generates high-quality Question-Answer pairs in Bahasa Melayu from text documents. Uses a three-stage AI pipeline to filter metadata, generate Q&A pairs, and review quality before exporting to CSV format. Perfect for creating educational content, study materials, or training datasets from Malay text sources.
-
+A Python web application that automatically generates high-quality Question-Answer pairs in Bahasa Melayu from text documents. Uses a three-stage AI pipeline to filter metadata, generate Q&A pairs, and review quality before exporting to CSV format. 
 Minimal instructions to get running locally with **Qwen: `qwen/qwen3-next-80b-a3b-instruct`**.
 
 ---

@@ -2,46 +2,58 @@
 
 A Python web application that automatically generates high-quality Question-Answer pairs in Bahasa Melayu from text documents. Uses a three-stage AI pipeline to filter metadata, generate Q&A pairs, and review quality before exporting to CSV format. Perfect for creating educational content, study materials, or training datasets from Malay text sources.
 
-Minimal instructions to get running locally with **Qwen: `qwen/qwen3-next-80b-a3b-instruct`** — **Web UI only (no CLI)**.
+Minimal instructions to get running locally with **Qwen: `qwen/qwen3-next-80b-a3b-instruct`**.
 
 ---
+Cara nak guna:
 
-## 1) Set Up
+## 1) Copy repository dalam IDE
 ```bash
+git clone https://github.com/zuftt/qna-pair-generator.git
+```
+
+## 2) Run these commmands dalam root directory
+```bash
+cd qna-pair-generator
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
 ```
-Edit **.env** (OpenRouter recommended):
+Create **.env** file and copy from env.example,
 ```dotenv
 OPENAI_API_KEY=YOUR_OPENROUTER_KEY
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
 QWEN_GEN_MODEL=qwen/qwen3-next-80b-a3b-instruct
 QWEN_REVIEW_MODEL=qwen/qwen3-next-80b-a3b-instruct
 ```
-Add your source files:
-```bash
-mkdir -p data
-# put your .txt files into ./data/
-```
+Then, replace  `YOUR_OPENROUTER_KEY` with OpenRouter API Key.
+You can follow this [tutorial](https://www.youtube.com/watch?v=QINOR9fATxY), to get an API Key.
 
----
+In my case I use OpenRouter to access Qwen's API. You can read more about OpenRouter [here](https://openrouter.ai/).
+The model I'm using is Qwen: Qwen3 Next 80B A3B Instruct.
+
+IMPORTANT: I use a paid model, because I've tried with the free ones and they are very slow. If you want to use a different model you can change the model in the `.env` file.
+
+<img width="1470" height="673" alt="Screenshot 2025-10-29 at 11 10 22 AM" src="https://github.com/user-attachments/assets/ee7e3b35-6e43-49c3-b52e-f6794415938e" />
+
+
 
 ## 2) Use on Localhost
 ### Web UI
 ```bash
-python qna_bm_web.py
+python3 qna_bm_web.py #or just run this file via IDE
 ```
 Open **http://localhost:8080** then:
-1. Upload your `.txt` files (drag & drop or file picker).
-2. Click **Generate** to create Q&A pairs.
-3. Preview results, then **Download** (CSV/JSONL).
+1. Wait for the API connection to verify, if it fails please check your API Key.
+2. Upload your `.txt` files (drag & drop or file picker).
+3. Click **Generate** to create Q&A pairs.
+4. Preview results, then **Download** (CSV/JSONL).
+   
+<img width="1322" height="860" alt="Screenshot 2025-10-29 at 11 15 04 AM" src="https://github.com/user-attachments/assets/184bdb4a-1a76-4a69-a1c9-be6e907a1efd" />
 
 ---
 
 ## Notes
-- No tuning needed—defaults use the specified Qwen model for both Generator and Reviewer.
-- If you prefer DashScope later, just replace `OPENAI_BASE_URL` and keep the same model or `qwen-plus`.
+- I'm open to suggestions on improvements, and if you encounter problem do contact me I will try to help.
 
 ---
 
@@ -49,18 +61,18 @@ Open **http://localhost:8080** then:
 
 This system uses a sophisticated three-stage pipeline to ensure high-quality, metadata-free Q&A pairs:
 
-### Stage 1: Pre-filter (Penyaring Awal)
+### Stage 1: Pre-filter 
 - **Purpose**: Filters out chunks containing metadata or inappropriate content
 - **Checks for**: File metadata, system information, non-Malay content, text length
 - **Output**: Accepts or rejects text chunks before processing
 
-### Stage 2: Generator (Penjana)
+### Stage 2: Generator 
 - **Purpose**: Generates Q&A pair candidates from validated text chunks
 - **Capabilities**: Creates up to 10 Q&A pairs per chunk across various difficulty levels
 - **Format**: Strict JSONL output with question, answer, and source
 - **Language**: Bahasa Melayu baku (standard Malay)
 
-### Stage 3: Reviewer (Penyemak)
+### Stage 3: Reviewer 
 - **Purpose**: Verifies and filters generated Q&A pairs for quality and accuracy
 - **Filters out**: Metadata (author names, journals, emails, references), low-quality pairs
 - **Actions**: Accept, edit (auto-correct), or reject pairs
@@ -73,6 +85,5 @@ Input Text → [Pre-filter] → Valid Chunks → [Generator] → Q&A Candidates 
 
 ### Performance Optimizations
 - **Parallel Processing**: Processes multiple chunks simultaneously (configurable workers)
-- **Skip Review Mode**: Fast mode that skips AI review but includes basic metadata filtering
 - **Smart Deduplication**: Fuzzy matching to prevent near-duplicate questions
 - **Metadata Stripping**: Automatically removes file headers and metadata before processing 

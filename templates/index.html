@@ -331,6 +331,7 @@
 
     <script>
         let qaPairs = [];
+        let fileInfo = {};
         
         const fileInput = document.getElementById('fileInput');
         const fileName = document.getElementById('fileName');
@@ -411,7 +412,13 @@
                                 progressFill.style.width = '70%';
                             } else if (data.type === 'complete') {
                                 qaPairs = data.pairs;
-                                displayResults(qaPairs);
+                                fileInfo = {
+                                    original_filename: data.original_filename,
+                                    file_size: data.file_size,
+                                    word_count: data.word_count,
+                                    pairs_generated: data.count
+                                };
+                                displayResults(qaPairs, fileInfo);
                                 showAlert(`Successfully generated ${data.count} Q&A pairs!`, 'success');
                                 downloadBtn.disabled = false;
                                 progressFill.style.width = '100%';
@@ -456,7 +463,10 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ pairs: qaPairs })
+                    body: JSON.stringify({ 
+                        pairs: qaPairs,
+                        original_filename: fileInfo.original_filename || 'qa_bm_pairs'
+                    })
                 });
 
                 if (!response.ok) {
@@ -479,13 +489,31 @@
             }
         });
 
-        function displayResults(pairs) {
+        function displayResults(pairs, fileInfo = {}) {
             if (pairs.length === 0) {
                 results.innerHTML = '<p style="color: #7f8c8d; text-align: center; padding: 20px;">No Q&A pairs generated.</p>';
                 return;
             }
 
             let html = '';
+            
+            // Add summary section if file info is available
+            if (fileInfo.original_filename) {
+                const fileSizeKB = Math.round(fileInfo.file_size / 1024);
+                html += `
+                    <div style="background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                        <h3 style="color: #0c5460; margin-bottom: 10px; font-size: 1.1em;">📊 Generation Summary</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 14px;">
+                            <div><strong>File:</strong> ${fileInfo.original_filename}</div>
+                            <div><strong>Size:</strong> ${fileSizeKB} KB (${fileInfo.word_count} words)</div>
+                            <div><strong>Q&A Pairs Generated:</strong> ${fileInfo.pairs_generated}</div>
+                            <div><strong>CSV Output:</strong> ${fileInfo.original_filename.replace('.txt', '')}.csv</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Add Q&A pairs
             pairs.forEach((pair, index) => {
                 html += `
                     <div class="result-item">

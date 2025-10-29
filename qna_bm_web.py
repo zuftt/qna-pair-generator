@@ -46,6 +46,7 @@ def generate_qa():
         # Read file content
         file_content = file.read().decode('utf-8')
         source_name = secure_filename(file.filename)
+        original_filename = file.filename  # Keep original filename for CSV naming
         
         # Clear progress queue
         while not progress_queue.empty():
@@ -76,11 +77,14 @@ def generate_qa():
                     max_workers=10  # Increase workers for faster processing
                 )
                 
-                # Send completion
+                # Send completion with file info
                 progress_queue.put({
                     'type': 'complete',
                     'pairs': pairs,
-                    'count': len(pairs)
+                    'count': len(pairs),
+                    'original_filename': original_filename,
+                    'file_size': len(file_content),
+                    'word_count': len(file_content.split())
                 })
             except ValueError as e:
                 # Handle API errors specifically
@@ -136,9 +140,14 @@ def download_csv():
     try:
         data = request.json
         pairs = data.get('pairs', [])
+        original_filename = data.get('original_filename', 'qa_bm_pairs')
         
         if not pairs:
             return jsonify({'error': 'No data to export'}), 400
+        
+        # Generate CSV filename based on original file
+        base_name = original_filename.replace('.txt', '') if original_filename.endswith('.txt') else original_filename
+        csv_filename = f"{base_name}.csv"
         
         # Create temporary CSV file
         temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', newline='', encoding='utf-8')
@@ -160,7 +169,7 @@ def download_csv():
             temp_file.name,
             mimetype='text/csv',
             as_attachment=True,
-            download_name='qa_bm_pairs.csv'
+            download_name=csv_filename
         )
     
     except Exception as e:

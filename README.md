@@ -22,8 +22,8 @@ Create **.env** file and copy from env.example,
 ```dotenv
 OPENAI_API_KEY=YOUR_OPENROUTER_KEY
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
-QWEN_GEN_MODEL=qwen/qwen3-next-80b-a3b-instruct
-QWEN_REVIEW_MODEL=qwen/qwen3-next-80b-a3b-instruct
+QWEN_GEN_MODEL=qwen/qwen3-30b-a3b:free
+QWEN_REVIEW_MODEL=qwen/qwen3-30b-a3b:free
 ```
 Then, replace  `YOUR_OPENROUTER_KEY` with OpenRouter API Key.
 You can follow this [tutorial](https://www.youtube.com/watch?v=QINOR9fATxY), to get an API Key.

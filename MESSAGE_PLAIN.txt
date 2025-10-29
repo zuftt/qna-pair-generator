@@ -1,0 +1,18 @@
+Assalamualaikum!
+
+Baru siap buat small project untuk generate Q&A pairs dari text file. Workflow dia ada 3 stage:
+
+Stage 1 (Pre-filter): Filter out metadata, system info, dan content yang tak sesuai sebelum generate
+
+Stage 2 (Generator): Generate Q&A pairs dari clean text chunks - sampai 10 pairs per chunk
+
+Stage 3 (Reviewer): Review setiap pair, reject kalau ada metadata terlepas (penulis, jurnal, e-mel, etc), ensure quality
+
+Flow: Text → Filter → Generate → Review → CSV output
+
+Ada web UI, boleh process files dengan cepat, dan export as CSV. Perfect untuk buat study materials atau training datasets dari text Bahasa Melayu.
+
+Boleh tengok kat: https://github.com/zuftt/qna-pair-generator
+
+Kalau ada yang nak try, welcome!
+

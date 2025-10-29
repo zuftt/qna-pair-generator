@@ -53,7 +53,7 @@ Open **http://localhost:8080** then:
 ---
 
 ## Notes
-- I'm open to suggestions on improvements, and if you encounter problem do contact me I will try to help.
+- I'm open to suggestions on improvements, and if you encounter problems do contact me I will try to help.
 
 ---
 

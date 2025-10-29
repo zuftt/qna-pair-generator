@@ -29,12 +29,12 @@ You can follow this [tutorial](https://www.youtube.com/watch?v=QINOR9fATxY), to 
 
 In my case I use OpenRouter to access Qwen's API. You can read more about OpenRouter [here](https://openrouter.ai/).
 
-The model I'm using is qwen/qwen3-30b-a3b:free.
+The model I'm using is qwen/qwen3-30b-a3b:free. [link](https://openrouter.ai/qwen/qwen3-30b-a3b:free/api)
 
 <img width="1470" height="824" alt="Screenshot 2025-10-29 at 4 39 41 PM" src="https://github.com/user-attachments/assets/0a700ee0-d450-4178-afcb-d8ce4bf27a27" />
 
 
-## 2) Use on Localhost
+## 3) Use on Localhost
 ### Web UI
 ```bash
 python3 qna_bm_web.py #or just run this file via IDE

@@ -29,12 +29,10 @@ Then, replace  `YOUR_OPENROUTER_KEY` with OpenRouter API Key.
 You can follow this [tutorial](https://www.youtube.com/watch?v=QINOR9fATxY), to get an API Key.
 
 In my case I use OpenRouter to access Qwen's API. You can read more about OpenRouter [here](https://openrouter.ai/).
-The model I'm using is Qwen: Qwen3 Next 80B A3B Instruct.
 
-IMPORTANT: I use a paid model, because I've tried with the free ones and they are very slow. If you want to use a different model you can change the model in the `.env` file.
+The model I'm using is qwen/qwen3-30b-a3b:free.
 
-<img width="1470" height="673" alt="Screenshot 2025-10-29 at 11 10 22 AM" src="https://github.com/user-attachments/assets/ee7e3b35-6e43-49c3-b52e-f6794415938e" />
-
+<img width="1470" height="824" alt="Screenshot 2025-10-29 at 4 39 41 PM" src="https://github.com/user-attachments/assets/0a700ee0-d450-4178-afcb-d8ce4bf27a27" />
 
 
 ## 2) Use on Localhost
@@ -46,7 +44,7 @@ Open **http://localhost:8080** then:
 1. Wait for the API connection to verify, if it fails please check your API Key.
 2. Upload your `.txt` files (drag & drop or file picker).
 3. Click **Generate** to create Q&A pairs.
-4. Preview results, then **Download** (CSV/JSONL).
+4. Preview results, then **Download** (CSV).
    
 <img width="1322" height="860" alt="Screenshot 2025-10-29 at 11 15 04 AM" src="https://github.com/user-attachments/assets/184bdb4a-1a76-4a69-a1c9-be6e907a1efd" />
 

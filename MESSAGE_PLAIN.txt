@@ -1,18 +1,18 @@
-Assalamualaikum!
+Salam, saya nak inform yang saya dah buat beberapa improvements pada QnA Pair Generator:
 
-Baru siap buat small project untuk generate Q&A pairs dari text file. Workflow dia ada 3 stage:
+**Perubahan:**
+- **Prescreening/Extraction** — sistem extract title, abstract, dan body content dengan lebih baik
+- **Preview sebelum generate** — boleh tengok apa yang akan pass kepada generator sebelum proses
+- **Better QnA generation prompts** — prompts diperbaiki untuk hasil yang lebih berkualiti
+- **No "kajian ini" questions** — sistem dah di-tune untuk elak generate soalan tanpa context seperti "kajian ini", "rajah ini", etc.
+- **CSV auto-named** — file CSV output auto guna tajuk dokumen sebagai nama file (bukan nama file asal)
 
-Stage 1 (Pre-filter): Filter out metadata, system info, dan content yang tak sesuai sebelum generate
+**Kebaikan:**
+- Extraction lebih accurate dan transparent
+- Q&A pairs lebih berkualiti dengan context yang jelas
+- File output lebih teratur dan mudah identify
+- Kurang soalan yang kurang relevan atau tanpa context
 
-Stage 2 (Generator): Generate Q&A pairs dari clean text chunks - sampai 10 pairs per chunk
+Semua changes dah push ke main branch. Boleh test dengan dokumen korang.
 
-Stage 3 (Reviewer): Review setiap pair, reject kalau ada metadata terlepas (penulis, jurnal, e-mel, etc), ensure quality
-
-Flow: Text → Filter → Generate → Review → CSV output
-
-Ada web UI, boleh process files dengan cepat, dan export as CSV. Perfect untuk buat study materials atau training datasets dari text Bahasa Melayu.
-
-Boleh tengok kat: https://github.com/zuftt/qna-pair-generator
-
-Kalau ada yang nak try, welcome!
-
+Terima kasih.

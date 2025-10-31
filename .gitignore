@@ -55,3 +55,6 @@ GITHUB_SETUP.md
 # Data folder - users add their own files here
 data/
 
+# Messages
+MESSAGE_PLAIN.txt
+

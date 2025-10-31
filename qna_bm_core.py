@@ -80,70 +80,97 @@ def chat(model: str, system: str, user: str, temperature: float = 0.2) -> str:
 
 # --- Text Chunking ---
 def chunk_words(text: str, size: int = CHUNK_WORDS, overlap: int = CHUNK_OVERLAP) -> List[Tuple[str, int, int]]:
-    """Chunk text by words with overlap"""
+    """Chunk text by words with overlap (no limit on words or chunks)"""
     words = text.split()
     if not words:
         return []
     chunks = []
     step = max(1, size - overlap)
-    for i in range(0, len(words), step):
+    # Process all words without stopping early
+    i = 0
+    while i < len(words):
         chunk_words_list = words[i:i + size]
-        if not chunk_words_list:
+        if chunk_words_list:
+            chunk_text = " ".join(chunk_words_list)
+            chunks.append((chunk_text, i, min(i + size, len(words))))
+        i += step
+        # Only stop if we've processed everything
+        if i >= len(words):
             break
-        chunk_text = " ".join(chunk_words_list)
-        chunks.append((chunk_text, i, min(i + size, len(words))))
     return chunks
 
-# --- Generation: Agent 1 (Penjana) ---
-def generate_pairs_for_chunk(chunk_text: str, source_name: str) -> List[Dict]:
-    """Generate up to 10 Q&A pairs for a text chunk"""
-    user_prompt = f"""Nama fail: {source_name}
+# --- Generation ---
+def generate_pairs_for_chunk(
+    chunk_text: str,
+    source_name: str,
+    *,
+    title: Optional[str] = None,
+    cap_this_chunk: Optional[int] = None,
+    total_target: Optional[int] = None,
+    produced_so_far: Optional[int] = None,
+    remaining_chunks: Optional[int] = None,
+) -> List[Dict]:
+    """Generate Q&A pairs for a text chunk using the new prompt schema (CLEAN_TEXT blocks)."""
+    clean_title = (title or "").strip()
+    clean_body = chunk_text.strip()
+    user_lines: List[str] = []
+    user_lines.append("CLEAN_TEXT:")
+    user_lines.append("TITLE:")
+    user_lines.append(clean_title)
+    user_lines.append("")
+    user_lines.append("ABSTRACT_BLOCK:")
+    user_lines.append("")
+    user_lines.append("")
+    user_lines.append("BODY_BLOCK:")
+    user_lines.append(clean_body)
+    user_lines.append("")
+    user_lines.append(f"SOURCE_LABEL: {source_name}")
+    # Targets and caps
+    if total_target is not None:
+        user_lines.append(f"MIN_TARGET = 80, TOTAL_TARGET = {int(total_target)}")
+    else:
+        user_lines.append("MIN_TARGET = 80, TOTAL_TARGET = 100")
+    if produced_so_far is not None:
+        user_lines.append(f"PRODUCED_SO_FAR = {int(max(0, produced_so_far))}")
+    if remaining_chunks is not None:
+        user_lines.append(f"REMAINING_CHUNKS = {int(max(0, remaining_chunks))}")
+    if cap_this_chunk is not None:
+        user_lines.append(f"CAP_THIS_CHUNK = {int(max(0, cap_this_chunk))}")
+    user_prompt = "\n".join(user_lines)
 
-Petikan teks:
-{chunk_text}
-
-Arahan: Hasilkan sehingga 10 pasangan Soal–Jawab dalam Bahasa Melayu. Setiap pasangan mesti unik dan disokong jelas oleh teks. Format JSONL (satu objek per baris) dengan kunci: question, answer, source."""
-    
     try:
-        raw = chat(MODEL_GEN, GENERATOR_SYSTEM, user_prompt, temperature=0.1)
+        raw = chat(MODEL_GEN, GENERATOR_SYSTEM, user_prompt, temperature=0.2)
     except Exception as e:
         print(f"Error generating pairs: {e}")
         return []
-    
     if not raw or not raw.strip():
         return []
-    
-    pairs = []
-    
+
+    pairs: List[Dict] = []
     for line in raw.splitlines():
         line = line.strip()
         if not line or line.startswith("```"):
             continue
-        
-        # Try to extract JSON from line
         try:
             obj = json.loads(line)
-            q = (obj.get("question") or "").strip()
-            a = (obj.get("answer") or "").strip()
-            if q and a:
-                pairs.append({"question": q, "answer": a, "source": source_name})
         except json.JSONDecodeError:
-            # Try to find JSON in the line
             if "{" in line and "}" in line:
                 start = line.find("{")
                 end = line.rfind("}") + 1
-                if start < end:
-                    try:
-                        obj = json.loads(line[start:end])
-                        q = (obj.get("question") or "").strip()
-                        a = (obj.get("answer") or "").strip()
-                        if q and a:
-                            pairs.append({"question": q, "answer": a, "source": source_name})
-                    except json.JSONDecodeError:
-                        pass
-            continue
-    
-    return pairs[:10]  # Cap at 10 pairs per chunk
+                try:
+                    obj = json.loads(line[start:end])
+                except json.JSONDecodeError:
+                    continue
+            else:
+                continue
+        q = (obj.get("question") or "").strip()
+        a = (obj.get("answer") or "").strip()
+        if q and a:
+            pairs.append({"question": q, "answer": a, "source": source_name})
+    # If a cap is supplied, enforce it
+    if cap_this_chunk is not None and cap_this_chunk >= 0:
+        return pairs[:cap_this_chunk]
+    return pairs
 
 # --- Pre-filter: Stage 1 (Penyaring Awal) ---
 def prefilter_chunk(chunk_text: str) -> Tuple[bool, str]:
@@ -185,17 +212,26 @@ Semak teks ini dan tentukan sama ada sesuai untuk Q&A."""
         # If prefilter fails, accept by default
         return True, f"Prefilter error: {str(e)}, accepting by default"
 
-# --- Review: Agent 3 (Penyemak) ---
-def review_pair(pair: Dict, supporting_text: str) -> Tuple[Optional[Dict], Optional[str]]:
-    """Review a Q&A pair and return (accepted_pair, reason_or_error)"""
-    review_prompt = f"""Teks sumber:
-{supporting_text}
+# --- Review ---
+def review_pair(pair: Dict, supporting_text: str, *, title: Optional[str] = None) -> Tuple[Optional[Dict], Optional[str]]:
+    """Review a Q&A pair using the new reviewer schema."""
+    user_lines: List[str] = []
+    user_lines.append("CLEAN_TEXT:")
+    user_lines.append("TITLE:")
+    user_lines.append((title or "").strip())
+    user_lines.append("")
+    user_lines.append("ABSTRACT_BLOCK:")
+    user_lines.append("")
+    user_lines.append("")
+    user_lines.append("BODY_BLOCK:")
+    user_lines.append(supporting_text.strip())
+    user_lines.append("")
+    user_lines.append(f"SOURCE_LABEL: {pair.get('source','')}")
+    user_lines.append("")
+    user_lines.append("PAIR:")
+    user_lines.append(json.dumps(pair, ensure_ascii=False))
+    review_prompt = "\n".join(user_lines)
 
-Pasangan cadangan:
-{json.dumps(pair, ensure_ascii=False, indent=2)}
-
-Semak pasangan ini dan pulangkan SATU objek JSON sahaja dengan status (accept/edit/reject), question, answer, dan reason."""
-    
     raw = chat(MODEL_REVIEW, REVIEWER_SYSTEM, review_prompt, temperature=0.0).strip()
     
     # Try to extract JSON from response
@@ -244,7 +280,8 @@ def is_dup_question(question: str, existing_questions: List[str], threshold: flo
 def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_PAIRS, 
                      progress_callback: Optional[Callable[[str], None]] = None,
                      max_workers: int = 5,
-                     skip_review: bool = True) -> List[Dict]:
+                     skip_review: bool = True,
+                     doc_title: Optional[str] = None) -> List[Dict]:
     """Process a single text file and return Q&A pairs using parallel processing"""
     accepted_pairs = []
     existing_questions = []
@@ -252,24 +289,6 @@ def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_
     
     if progress_callback:
         progress_callback(f"Processing: {source_name}")
-    
-    # Strip metadata headers if present (lines before "Teks:" or main content)
-    if "Teks:" in text_content:
-        text_content = text_content.split("Teks:")[-1].strip()
-    elif "ID Fail :" in text_content or "Tajuk :" in text_content:
-        # Find where actual content starts (after metadata)
-        lines = text_content.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip() and not any(keyword in line for keyword in ["ID Fail", "Tajuk", "Penulis", "Tarikh", "Bidang", "Subbidang", "Sumber", "Tahap", "Bahasa", "Laras", "Panjang", "Sensitif", "Format", "Kaedah", "Hak Guna", "Rujukan"]):
-                # Found content, skip metadata lines
-                text_content = '\n'.join(lines[i:]).strip()
-                break
-    
-    # Check if text is too short
-    if len(text_content.strip()) < 50:
-        if progress_callback:
-            progress_callback("Text too short for processing")
-        return []
     
     chunks = chunk_words(text_content, CHUNK_WORDS, CHUNK_OVERLAP)
     total_chunks = len(chunks)
@@ -289,11 +308,6 @@ def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_
         
         try:
             # Stage 1: Pre-filter chunk (basic check, skip AI call for speed when review disabled)
-            # Simple length check first
-            if len(chunk_text.split()) < 50:
-                if progress_callback:
-                    progress_callback(f"Chunk {idx} too short ({len(chunk_text.split())} words)")
-                return chunk_results
             
             # Only run full prefilter AI check if review is enabled (for quality)
             # When review is disabled, we skip prefilter AI call for speed
@@ -304,8 +318,21 @@ def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_
                         progress_callback(f"Chunk {idx} rejected by prefilter: {reason}")
                     return chunk_results
             
-            # Stage 2: Generate candidates
-            candidate_pairs = generate_pairs_for_chunk(chunk_text, src_name)
+            # Stage 2: Generate candidates using new prompt schema
+            with lock:
+                current_produced = len(accepted_pairs)
+            remaining_budget = max(0, max_pairs - current_produced)
+            remaining_after_this = max(1, total - idx + 1)
+            cap_this_chunk = min(12, max(0, round(remaining_budget / remaining_after_this)))
+            candidate_pairs = generate_pairs_for_chunk(
+                chunk_text,
+                src_name,
+                title=doc_title or source_name,
+                cap_this_chunk=cap_this_chunk,
+                total_target=max_pairs,
+                produced_so_far=current_produced,
+                remaining_chunks=remaining_after_this - 1,
+            )
             
             if not candidate_pairs:
                 if progress_callback:
@@ -335,7 +362,7 @@ def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_
                     reviewed = pair
                     reason = None
                 else:
-                    reviewed, reason = review_pair(pair, chunk_text)
+                    reviewed, reason = review_pair(pair, chunk_text, title=doc_title or source_name)
                 
                 if reviewed and isinstance(reviewed, dict):
                     # Add to results with lock

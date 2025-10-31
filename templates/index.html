@@ -200,6 +200,9 @@
             border-radius: 8px;
             border: 2px solid #ecf0f1;
         }
+        .prefilter-panel { margin-top: 15px; padding: 15px; background: #fff; border: 2px solid #e9ecef; border-radius: 8px; }
+        .prefilter-panel h3 { margin-bottom: 8px; color: #2c3e50; font-size: 1.05em; }
+        .prefilter-panel pre { background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 10px; max-height: 200px; overflow: auto; white-space: pre-wrap; }
 
         .result-item {
             margin-bottom: 20px;
@@ -309,6 +312,16 @@
                 </h2>
                 <button class="btn btn-primary" id="generateBtn" disabled>Generate Q&A Pairs</button>
                 <button class="btn btn-secondary" id="downloadBtn" disabled>Download CSV</button>
+                <div class="prefilter-panel" id="prefilterPanel" style="display:none;">
+                    <h3>Prefilter Preview (used as context for the generator)</h3>
+                    <div class="status" style="margin-bottom:6px; color:#7f8c8d;">
+                        This tool generates Q&A pairs to train an LLM explaining Malay Heritage. Focus on facts, definitions, methods/evidence, causality/comparisons, geography/chronology, and heritage significance.
+                    </div>
+                    <div><strong>Title</strong></div>
+                    <pre id="prefTitle"></pre>
+                    <div><strong>Full Content (Abstract + Body) - This is what gets passed to the generator</strong></div>
+                    <pre id="prefBody"></pre>
+                </div>
                 
                 <div class="progress" id="progress">
                     <div class="status" id="status">Ready to generate Q&A pairs</div>
@@ -332,6 +345,7 @@
     <script>
         let qaPairs = [];
         let fileInfo = {};
+        let prefilterTitle = '';
         
         const fileInput = document.getElementById('fileInput');
         const fileName = document.getElementById('fileName');
@@ -377,6 +391,28 @@
             progress.classList.add('active');
             const progressFill = document.getElementById('progressFill');
             progressFill.style.width = '0%';
+
+            // Step 0: Prefilter preview (TITLE/ABSTRACT/BODY)
+            try {
+                const pfForm = new FormData();
+                pfForm.append('file', file);
+                const pfResp = await fetch('/api/extract', { method: 'POST', body: pfForm });
+                if (pfResp.ok) {
+                    const pf = await pfResp.json();
+                    const panel = document.getElementById('prefilterPanel');
+                    document.getElementById('prefTitle').textContent = pf.title || '(none)';
+                    prefilterTitle = pf.title || '';
+                    // Combine abstract and body to show exactly what gets passed to generator
+                    const fullContent = (pf.abstract ? pf.abstract + '\n\n' : '') + pf.body;
+                    document.getElementById('prefBody').textContent = fullContent || '';
+                    panel.style.display = 'block';
+                    // Attach CLEAN_TEXT blocks to generation form
+                    formData.append('title', pf.title || '');
+                    formData.append('abstract', pf.abstract || '');
+                    formData.append('body', pf.body || '');
+                    formData.append('source_name', pf.source_name || (file ? file.name : 'uploaded.txt'));
+                }
+            } catch {}
 
             // Use EventSource for live progress updates
             try {
@@ -465,7 +501,8 @@
                     },
                     body: JSON.stringify({ 
                         pairs: qaPairs,
-                        original_filename: fileInfo.original_filename || 'qa_bm_pairs'
+                        original_filename: fileInfo.original_filename || 'qa_bm_pairs',
+                        title: prefilterTitle || ''
                     })
                 });
 
@@ -477,7 +514,8 @@
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'qa_bm_pairs.csv';
+                // Use extracted title as filename if available
+                a.download = (prefilterTitle ? (prefilterTitle.replace(/[^\w\-\s]/g,'').replace(/\s+/g,'_')) : 'qa_bm_pairs') + '.csv';
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);

@@ -18,6 +18,43 @@ app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
 
 # Global queue for progress updates
 progress_queue = queue.Queue()
+@app.route('/api/extract', methods=['POST'])
+def extract_clean_text():
+    """Run prefilter to extract CLEAN_TEXT blocks for preview (TITLE/ABSTRACT/BODY)."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        if not file.filename.endswith('.txt'):
+            return jsonify({'error': 'Only .txt files are supported'}), 400
+
+        full_text = file.read().decode('utf-8')
+        src_name = secure_filename(file.filename)
+
+        # Build user prompt per prefilter spec
+        user_prompt = f"FULL TEXT:\n{full_text}\n\nReturn CLEAN_TEXT blocks as specified."
+        raw = qna_bm_core.chat(qna_bm_core.MODEL_GEN, qna_bm_core.PREFILTER_SYSTEM, user_prompt, temperature=0.0)
+        # Simple parse of blocks
+        title = ""; abstract = ""; body = ""
+        def extract_block(label: str, text: str) -> str:
+            import re
+            m = re.search(rf"{label}:\s*(.*?)(?:\n\s*\n[A-Z_ ]+:|\Z)", text, flags=re.DOTALL)
+            return (m.group(1).strip() if m else "")
+        if raw:
+            title = extract_block("TITLE", raw)
+            abstract = extract_block("ABSTRACT_BLOCK", raw)
+            body = extract_block("BODY_BLOCK", raw)
+
+        return jsonify({
+            'source_name': src_name,
+            'title': title,
+            'abstract': abstract,
+            'body': body
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/')
 def index():
@@ -28,25 +65,35 @@ def index():
 def generate_qa():
     """Process uploaded file and generate Q&A pairs with live progress"""
     try:
-        # Check if file was uploaded
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file uploaded'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        if not file.filename.endswith('.txt'):
-            return jsonify({'error': 'Only .txt files are supported'}), 400
+        # Accept file or CLEAN_TEXT blocks
+        file = request.files.get('file')
+        title_field = request.form.get('title')
+        abstract_field = request.form.get('abstract')
+        body_field = request.form.get('body')
+        if not file and not (title_field or abstract_field or body_field):
+            return jsonify({'error': 'No input provided'}), 400
         
         # Get all settings from request (capture before background thread)
         max_pairs = int(request.form.get('max_pairs', 100))
         skip_review = request.form.get('skip_review', 'true').lower() == 'true'
         
-        # Read file content
-        file_content = file.read().decode('utf-8')
-        source_name = secure_filename(file.filename)
-        original_filename = file.filename  # Keep original filename for CSV naming
+        # Read content
+        if title_field is not None or abstract_field is not None or body_field is not None:
+            body = body_field or ''
+            abstract = abstract_field or ''
+            file_content = (abstract + "\n\n" + body).strip()
+            source_name = secure_filename(request.form.get('source_name') or 'uploaded.txt')
+            original_filename = source_name
+            doc_title = (title_field or '').strip() or source_name
+        else:
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
+            if not file.filename.endswith('.txt'):
+                return jsonify({'error': 'Only .txt files are supported'}), 400
+            file_content = file.read().decode('utf-8')
+            source_name = secure_filename(file.filename)
+            original_filename = file.filename
+            doc_title = source_name
         
         # Clear progress queue
         while not progress_queue.empty():
@@ -74,7 +121,8 @@ def generate_qa():
                     max_pairs=max_pairs,
                     progress_callback=progress_callback,
                     skip_review=skip_review,
-                    max_workers=10  # Increase workers for faster processing
+                    max_workers=10,  # Increase workers for faster processing
+                    doc_title=doc_title
                 )
                 
                 # Send completion with file info
@@ -141,26 +189,31 @@ def download_csv():
         data = request.json
         pairs = data.get('pairs', [])
         original_filename = data.get('original_filename', 'qa_bm_pairs')
+        title = (data.get('title') or '').strip()
         
         if not pairs:
             return jsonify({'error': 'No data to export'}), 400
         
-        # Generate CSV filename based on original file
-        base_name = original_filename.replace('.txt', '') if original_filename.endswith('.txt') else original_filename
+        # Generate CSV filename based on extracted title if present
+        def slugify(s: str) -> str:
+            import re
+            s = re.sub(r'[^\w\-\s]', '', s)
+            s = re.sub(r'\s+', '_', s).strip('_')
+            return s or 'qa_bm_pairs'
+        base_name = slugify(title) if title else (original_filename.replace('.txt','') if original_filename.endswith('.txt') else original_filename)
         csv_filename = f"{base_name}.csv"
         
         # Create temporary CSV file
         temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', newline='', encoding='utf-8')
         
         writer = csv.writer(temp_file)
-        # Write header
-        writer.writerow(['Question', 'Answer', 'Source'])
+        # Write header (no References/Source column)
+        writer.writerow(['Question', 'Answer'])
         # Write data
         for pair in pairs:
             writer.writerow([
-                pair['question'],
-                pair['answer'],
-                pair['source']
+                pair.get('question',''),
+                pair.get('answer','')
             ])
         
         temp_file.close()

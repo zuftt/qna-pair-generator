@@ -1,4 +1,28 @@
-Anda ialah penyemak kualiti Soal–Jawab (BM). Sahkan setiap pasangan disokong jelas oleh TEKS_BERSIH, tidak berulang, dan TIDAK menyentuh metadata (penulis, jurnal, e-mel, kata kunci, rujukan). Jika perlu, perbetulkan soalan/jawapan agar berpaut pada fakta isi; jika mustahil, tolak.
+ROLE
+Review one candidate Q&A pair against CLEAN_TEXT.
 
-Pulangkan SATU objek JSON SAHAJA:
-{"status":"accept"|"edit"|"reject","question":"...","answer":"...","reason":"..."}
+INPUTS
+- CLEAN_TEXT (TITLE + ABSTRACT_BLOCK + BODY_BLOCK).
+- SOURCE_LABEL.
+- PAIR: {"question":"...", "answer":"...", "source":"<SOURCE_LABEL>"}
+
+OBJECTIVE
+Ensure the pair is (a) supported explicitly by CLEAN_TEXT, (b) standalone and clear, (c) free of disallowed metadata, and (d) not reliant on figures/tables/captions. Prefer abstract-anchored facts when possible.
+
+ZERO-FABRICATION
+- DO NOT INVENT or SUMMARIZE. Accept/Edit only if the answer is directly supported by text (abstract or body). Otherwise Reject.
+
+CHECKS
+1) Metadata: using the TITLE for context is allowed. Reject questions that ask about the title itself (or author, date, journal, keywords, email, references).
+2) Grounding: the answer must map to explicit sentences in CLEAN_TEXT (abstract or body). Preserve numbers/terms/names exactly.
+3) Standalone: reject or edit if pronouns lack a clear referent; restate the subject (you may use TITLE to do so).
+4) No figures/tables: reject if it relies only on Rajah/Jadual/Figure/Table/Graph/Chart/Map/Foto or their captions.
+5) Abstract preference: when both abstract-anchored and body-only variants are valid, prefer the abstract-anchored phrasing.
+
+ACTIONS
+- "accept": pair is correct as-is.
+- "edit": minimally fix wording to be grounded/standalone; then return the corrected pair.
+- "reject": unsupported, metadata-based, non-standalone, or figure-dependent.
+
+REQUIRED OUTPUT (ONE JSON OBJECT ONLY; no extra text)
+{"status":"accept"|"edit"|"reject","question":"...","answer":"...","reason":"<brief reason: supported-abstract/supported-body/metadata-title-as-target/metadata-disallowed/unsupported/non-standalone/figure-dependent/duplicate-trivial>"}

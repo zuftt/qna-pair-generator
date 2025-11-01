@@ -260,12 +260,13 @@ def download_csv():
         writer.writerow(['Soalan', 'Jawapan', 'Abstract', 'Domain', 'Sumber', 'Potongan_teks'])
         # Write data
         for pair in pairs:
-            # Use extracted source (Sumber) from document, not filename or chunk reference
-            sumber_value = source if source else pair.get('source', source_name)
-            # Extract chunk number from source (e.g., "filename.txt Chunk 2" -> "2")
+            # Use extracted source (Sumber) from document for Sumber column
+            sumber_value = source if source else source_name
+            # Extract chunk number from pair's source (e.g., "filename.txt Chunk 2" -> "2")
             chunk_num = ''
-            if 'Chunk ' in sumber_value:
-                chunk_num = sumber_value.split('Chunk ')[1] if 'Chunk ' in sumber_value else ''
+            pair_source = pair.get('source', '')
+            if 'Chunk ' in pair_source:
+                chunk_num = pair_source.split('Chunk ')[1]
             writer.writerow([
                 pair.get('question',''),
                 pair.get('answer',''),

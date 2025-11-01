@@ -226,6 +226,15 @@
         .prefilter-panel { margin-top: 15px; padding: 15px; background: #fff; border: 2px solid #e9ecef; border-radius: 8px; }
         .prefilter-panel h3 { margin-bottom: 8px; color: #2c3e50; font-size: 1.05em; }
         .prefilter-panel pre { background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 10px; max-height: 200px; overflow: auto; white-space: pre-wrap; }
+        .chunks-panel { margin-top: 10px; }
+        .chunk-item { background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 10px; margin-bottom: 8px; }
+        .chunk-header { font-weight: 600; color: #667eea; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .chunk-toggle { font-size: 0.85em; color: #667eea; cursor: pointer; text-decoration: underline; }
+        .chunk-toggle:hover { color: #5568d3; }
+        .chunk-preview { color: #34495e; font-size: 0.9em; line-height: 1.5; }
+        .chunk-details { font-size: 0.85em; color: #7f8c8d; margin-top: 5px; }
+        .chunk-full { display: none; margin-top: 10px; padding: 8px; background: #fff; border: 1px solid #e1e4e8; border-radius: 4px; white-space: pre-wrap; font-size: 0.9em; max-height: 400px; overflow-y: auto; }
+        .chunk-full.expanded { display: block; }
 
         .result-item {
             margin-bottom: 20px;
@@ -324,8 +333,8 @@
             <div class="section">
                 <h2>⚙️ Configuration</h2>
                 <div class="config-group">
-                    <label for="maxPairs">Max Q&A Pairs:</label>
-                    <input type="number" id="maxPairs" value="100" min="1" max="500" />
+                    <label for="maxPairs">Max Q&A Pairs <span style="color: #7f8c8d; font-weight: normal;">(Optional Cap)</span>:</label>
+                    <input type="number" id="maxPairs" placeholder="Auto" min="1" max="500" />
                 </div>
                 <div class="config-group" style="margin-top: 15px;">
                     <label for="domain">Domain:</label>
@@ -334,6 +343,12 @@
                         <option value="Agama">Agama</option>
                         <option value="Bahasa dan Linguistik">Bahasa dan Linguistik</option>
                         <option value="Pendidikan">Pendidikan</option>
+                        <option value="Sosial dan Budaya">Sosial dan Budaya</option>
+                        <option value="Sains dan Teknologi">Sains dan Teknologi</option>
+                        <option value="Kesusasteraan dan Seni">Kesusasteraan dan Seni</option>
+                        <option value="Ekonomi dan Perniagaan">Ekonomi dan Perniagaan</option>
+                        <option value="Politik">Politik</option>
+                        <option value="Umum">Umum</option>
                     </select>
                 </div>
             </div>
@@ -353,8 +368,16 @@
                     </div>
                     <div><strong>Title</strong></div>
                     <pre id="prefTitle"></pre>
+                    <div><strong>Sumber</strong></div>
+                    <pre id="prefSource"></pre>
+                    <div><strong>Abstract</strong></div>
+                    <pre id="prefAbstract"></pre>
                     <div><strong>Full Content (Abstract + Body) - This is what gets passed to the generator</strong></div>
                     <pre id="prefBody"></pre>
+                    <div id="chunksPreview" style="margin-top: 15px; display:none;">
+                        <strong id="chunksHeader">Chunks Preview</strong>
+                        <div id="chunksList" class="chunks-panel"></div>
+                    </div>
                 </div>
                 
                 <div class="progress" id="progress">
@@ -448,6 +471,8 @@
                     const panel = document.getElementById('prefilterPanel');
                     document.getElementById('prefTitle').textContent = pf.title || '(none)';
                     prefilterTitle = pf.title || '';
+                    document.getElementById('prefAbstract').textContent = pf.abstract || '(none)';
+                    document.getElementById('prefSource').textContent = pf.source || '(none)';
                     // Combine abstract and body to show exactly what gets passed to generator
                     const fullContent = (pf.abstract ? pf.abstract + '\n\n' : '') + pf.body;
                     document.getElementById('prefBody').textContent = fullContent || '';
@@ -456,14 +481,30 @@
                     extractedData = {
                         title: pf.title || '',
                         abstract: pf.abstract || '',
+                        source: pf.source || '',
                         body: pf.body || '',
                         source_name: pf.source_name || (file ? file.name : 'uploaded.txt')
                     };
                     // Attach CLEAN_TEXT blocks to generation form
                     formData.append('title', extractedData.title);
                     formData.append('abstract', extractedData.abstract);
+                    formData.append('source', extractedData.source);
                     formData.append('body', extractedData.body);
                     formData.append('source_name', extractedData.source_name);
+                    
+                    // Load and display chunks preview
+                    try {
+                        const chunksForm = new FormData();
+                        chunksForm.append('abstract', extractedData.abstract);
+                        chunksForm.append('body', extractedData.body);
+                        const chunksResp = await fetch('/api/preview-chunks', { method: 'POST', body: chunksForm });
+                        if (chunksResp.ok) {
+                            const chunksData = await chunksResp.json();
+                            displayChunks(chunksData.chunks, chunksData.total_chunks);
+                        }
+                    } catch (chunksError) {
+                        console.log('Chunks preview failed:', chunksError);
+                    }
                 }
             } catch {}
 
@@ -505,7 +546,10 @@
                                     original_filename: data.original_filename,
                                     file_size: data.file_size,
                                     word_count: data.word_count,
-                                    pairs_generated: data.count
+                                    pairs_generated: data.count,
+                                    abstract: data.abstract || '',
+                                    source: data.source || '',
+                                    source_name: data.source_name || ''
                                 };
                                 displayResults(qaPairs, fileInfo);
                                 showAlert(`Successfully generated ${data.count} Q&A pairs!`, 'success');
@@ -564,6 +608,7 @@
             const genFormData = new FormData();
             genFormData.append('title', extractedData.title);
             genFormData.append('abstract', extractedData.abstract);
+            genFormData.append('source', extractedData.source);
             genFormData.append('body', extractedData.body);
             genFormData.append('source_name', extractedData.source_name);
             genFormData.append('max_pairs', maxPairsInput.value);
@@ -610,7 +655,10 @@
                                     original_filename: data.original_filename,
                                     file_size: data.file_size,
                                     word_count: data.word_count,
-                                    pairs_generated: qaPairs.length
+                                    pairs_generated: qaPairs.length,
+                                    abstract: data.abstract || '',
+                                    source: data.source || '',
+                                    source_name: data.source_name || ''
                                 };
                                 displayResults(qaPairs, fileInfo);
                                 showAlert(`Successfully generated ${newPairs.length} additional Q&A pairs! Total: ${qaPairs.length}`, 'success');
@@ -662,7 +710,10 @@
                         pairs: qaPairs,
                         original_filename: fileInfo.original_filename || 'qa_bm_pairs',
                         title: prefilterTitle || '',
-                        domain: domainInput.value
+                        domain: domainInput.value,
+                        abstract: fileInfo.abstract || '',
+                        source: fileInfo.source || '',
+                        source_name: fileInfo.source_name || ''
                     })
                 });
 
@@ -746,15 +797,60 @@
 
             // Add Q&A pairs
             pairs.forEach((pair, index) => {
+                // Extract just the chunk reference from source (e.g., "filename.txt Chunk 2" -> "Chunk 2")
+                const sourceDisplay = pair.source.includes('Chunk ') 
+                    ? pair.source.split('Chunk ')[1] ? `Chunk ${pair.source.split('Chunk ')[1]}` : pair.source
+                    : pair.source;
                 html += `
                     <div class="result-item">
                         <strong>${index + 1}. ${pair.question}</strong>
                         <p>${pair.answer}</p>
-                        <small style="color: #7f8c8d;">Source: ${pair.source}</small>
+                        <small style="color: #7f8c8d;">Source: ${sourceDisplay}</small>
                     </div>
                 `;
             });
             results.innerHTML = html;
+        }
+
+        function displayChunks(chunks, totalChunks) {
+            const chunksPreview = document.getElementById('chunksPreview');
+            const chunksList = document.getElementById('chunksList');
+            const chunksHeader = document.getElementById('chunksHeader');
+            
+            chunksHeader.textContent = `Chunks Preview (${totalChunks} chunks will be processed)`;
+            
+            let html = '';
+            chunks.forEach(chunk => {
+                html += `
+                    <div class="chunk-item">
+                        <div class="chunk-header">
+                            <span>Chunk ${chunk.index}</span>
+                            <span class="chunk-toggle" onclick="toggleChunk(${chunk.index})" id="toggle-${chunk.index}">Show Full</span>
+                        </div>
+                        <div class="chunk-preview" id="preview-${chunk.index}">${chunk.preview}</div>
+                        <div class="chunk-full" id="full-${chunk.index}">${chunk.full_text}</div>
+                        <div class="chunk-details">Words ${chunk.word_range} • ${chunk.word_count} words</div>
+                    </div>
+                `;
+            });
+            chunksList.innerHTML = html;
+            chunksPreview.style.display = 'block';
+        }
+
+        function toggleChunk(index) {
+            const preview = document.getElementById(`preview-${index}`);
+            const full = document.getElementById(`full-${index}`);
+            const toggle = document.getElementById(`toggle-${index}`);
+            
+            if (full.classList.contains('expanded')) {
+                // Collapse
+                full.classList.remove('expanded');
+                toggle.textContent = 'Show Full';
+            } else {
+                // Expand
+                full.classList.add('expanded');
+                toggle.textContent = 'Show Less';
+            }
         }
 
         function showAlert(message, type) {

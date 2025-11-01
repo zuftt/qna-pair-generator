@@ -37,7 +37,7 @@ def extract_clean_text():
         user_prompt = f"FULL TEXT:\n{full_text}\n\nReturn CLEAN_TEXT blocks as specified."
         raw = core.chat(core.MODEL_GEN, core.PREFILTER_SYSTEM, user_prompt, temperature=0.0)
         # Simple parse of blocks
-        title = ""; abstract = ""; body = ""
+        title = ""; abstract = ""; source = ""; body = ""
         def extract_block(label: str, text: str) -> str:
             import re
             m = re.search(rf"{label}:\s*(.*?)(?:\n\s*\n[A-Z_ ]+:|\Z)", text, flags=re.DOTALL)
@@ -45,13 +45,49 @@ def extract_clean_text():
         if raw:
             title = extract_block("TITLE", raw)
             abstract = extract_block("ABSTRACT_BLOCK", raw)
+            source = extract_block("SOURCE", raw)
             body = extract_block("BODY_BLOCK", raw)
 
         return jsonify({
             'source_name': src_name,
             'title': title,
             'abstract': abstract,
+            'source': source,
             'body': body
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/preview-chunks', methods=['POST'])
+def preview_chunks():
+    """Preview chunks from extracted clean text (for display only)"""
+    try:
+        # Get extracted data from the frontend
+        abstract = request.form.get('abstract', '')
+        body = request.form.get('body', '')
+        
+        # Combine for chunking
+        combined_text = f"{abstract}\n\n{body}".strip()
+        
+        # Use core's chunking function
+        chunks = core.chunk_words(combined_text, core.CHUNK_WORDS, core.CHUNK_OVERLAP)
+        
+        # Format for display
+        chunks_display = []
+        for idx, (chunk_text, start_word, end_word) in enumerate(chunks, 1):
+            # Preview first 200 characters of each chunk
+            preview = chunk_text[:200] + '...' if len(chunk_text) > 200 else chunk_text
+            chunks_display.append({
+                'index': idx,
+                'preview': preview,
+                'full_text': chunk_text,
+                'word_range': f"{start_word}-{end_word}",
+                'word_count': len(chunk_text.split())
+            })
+        
+        return jsonify({
+            'total_chunks': len(chunks),
+            'chunks': chunks_display
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -69,18 +105,22 @@ def generate_qa():
         file = request.files.get('file')
         title_field = request.form.get('title')
         abstract_field = request.form.get('abstract')
+        source_field = request.form.get('source')
         body_field = request.form.get('body')
         if not file and not (title_field or abstract_field or body_field):
             return jsonify({'error': 'No input provided'}), 400
         
         # Get all settings from request (capture before background thread)
-        max_pairs = int(request.form.get('max_pairs', 100))
+        # max_pairs is optional - if empty or 0, use adaptive only; otherwise use as cap
+        max_pairs_str = request.form.get('max_pairs', '').strip()
+        max_pairs = int(max_pairs_str) if max_pairs_str and max_pairs_str != '0' else None
         skip_review = request.form.get('skip_review', 'true').lower() == 'true'
         
         # Read content
         if title_field is not None or abstract_field is not None or body_field is not None:
             body = body_field or ''
             abstract = abstract_field or ''
+            source = source_field or ''
             file_content = (abstract + "\n\n" + body).strip()
             source_name = secure_filename(request.form.get('source_name') or 'uploaded.txt')
             original_filename = source_name
@@ -94,6 +134,8 @@ def generate_qa():
             source_name = secure_filename(file.filename)
             original_filename = file.filename
             doc_title = source_name
+            abstract = ''  # No abstract when reading raw file
+            source = ''  # No source when reading raw file
         
         # Clear progress queue
         while not progress_queue.empty():
@@ -132,7 +174,10 @@ def generate_qa():
                     'count': len(pairs),
                     'original_filename': original_filename,
                     'file_size': len(file_content),
-                    'word_count': len(file_content.split())
+                    'word_count': len(file_content.split()),
+                    'abstract': abstract,
+                    'source': source,
+                    'source_name': source_name
                 })
             except ValueError as e:
                 # Handle API errors specifically
@@ -191,6 +236,9 @@ def download_csv():
         original_filename = data.get('original_filename', 'qa_bm_pairs')
         title = (data.get('title') or '').strip()
         domain = data.get('domain', 'Sejarah').strip()
+        abstract = (data.get('abstract') or '').strip()
+        source = (data.get('source') or '').strip()
+        source_name = (data.get('source_name') or original_filename).strip()
         
         if not pairs:
             return jsonify({'error': 'No data to export'}), 400
@@ -208,14 +256,23 @@ def download_csv():
         temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', newline='', encoding='utf-8')
         
         writer = csv.writer(temp_file)
-        # Write header with Domain column
-        writer.writerow(['Question', 'Answer', 'Domain'])
+        # Write header with Abstract, Domain, Sumber, and Chunk columns
+        writer.writerow(['Soalan', 'Jawapan', 'Abstract', 'Domain', 'Sumber', 'Potongan_teks'])
         # Write data
         for pair in pairs:
+            # Use extracted source (Sumber) from document, not filename or chunk reference
+            sumber_value = source if source else pair.get('source', source_name)
+            # Extract chunk number from source (e.g., "filename.txt Chunk 2" -> "2")
+            chunk_num = ''
+            if 'Chunk ' in sumber_value:
+                chunk_num = sumber_value.split('Chunk ')[1] if 'Chunk ' in sumber_value else ''
             writer.writerow([
                 pair.get('question',''),
                 pair.get('answer',''),
-                domain
+                abstract,  # Same abstract for all pairs from same document
+                domain,    # Same domain for all pairs
+                sumber_value,  # Sumber - extracted from document
+                chunk_num  # Chunk number only
             ])
         
         temp_file.close()

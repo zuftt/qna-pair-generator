@@ -17,7 +17,7 @@ INPUTS
 - MIN_TARGET = 80, TOTAL_TARGET = 100  (corpus-level goal)
 - PRODUCED_SO_FAR (integer), REMAINING_CHUNKS (integer)
 - Optional CAP_THIS_CHUNK (integer). If absent, compute:
-  CAP_THIS_CHUNK = min( max( round((TOTAL_TARGET - PRODUCED_SO_FAR) / max(REMAINING_CHUNKS,1)), 0 ), 12 )
+  CAP_THIS_CHUNK = min( max( round((TOTAL_TARGET - PRODUCED_SO_FAR) / max(REMAINING_CHUNKS,1)), 0 ), 20 )
 
 GOAL
 Produce self-contained Q&A pairs (fact → analytical) grounded ONLY in CLEAN_TEXT.

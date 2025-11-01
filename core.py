@@ -109,6 +109,7 @@ def generate_pairs_for_chunk(
     total_target: Optional[int] = None,
     produced_so_far: Optional[int] = None,
     remaining_chunks: Optional[int] = None,
+    chunk_idx: Optional[int] = None,
 ) -> List[Dict]:
     """Generate Q&A pairs for a text chunk using the new prompt schema (CLEAN_TEXT blocks)."""
     clean_title = (title or "").strip()
@@ -124,7 +125,11 @@ def generate_pairs_for_chunk(
     user_lines.append("BODY_BLOCK:")
     user_lines.append(clean_body)
     user_lines.append("")
-    user_lines.append(f"SOURCE_LABEL: {source_name}")
+    # Use chunk reference if available, otherwise use source name
+    if chunk_idx:
+        user_lines.append(f"SOURCE_LABEL: {source_name} Chunk {chunk_idx}")
+    else:
+        user_lines.append(f"SOURCE_LABEL: {source_name}")
     # Targets and caps
     if total_target is not None:
         user_lines.append(f"MIN_TARGET = 80, TOTAL_TARGET = {int(total_target)}")
@@ -166,7 +171,9 @@ def generate_pairs_for_chunk(
         q = (obj.get("question") or "").strip()
         a = (obj.get("answer") or "").strip()
         if q and a:
-            pairs.append({"question": q, "answer": a, "source": source_name})
+            # Use chunk reference if available
+            src_label = f"{source_name} Chunk {chunk_idx}" if chunk_idx else source_name
+            pairs.append({"question": q, "answer": a, "source": src_label})
     # If a cap is supplied, enforce it
     if cap_this_chunk is not None and cap_this_chunk >= 0:
         return pairs[:cap_this_chunk]
@@ -277,7 +284,7 @@ def is_dup_question(question: str, existing_questions: List[str], threshold: flo
     return False
 
 # --- Process single text file with async/parallel processing ---
-def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_PAIRS, 
+def process_text_file(text_content: str, source_name: str, max_pairs: Optional[int] = None, 
                      progress_callback: Optional[Callable[[str], None]] = None,
                      max_workers: int = 5,
                      skip_review: bool = True,
@@ -298,8 +305,35 @@ def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_
             progress_callback("No chunks generated from text")
         return []
     
+    # Adaptive max_pairs based on document size (always calculated)
+    word_count = len(text_content.split())
+    # Estimate: ~15-20 pairs per 800-word chunk, but cap at reasonable limits
+    estimated_pairs = min(word_count // 40, total_chunks * 20)  # 1 pair per ~40 words or 20 per chunk
+    # Ensure minimum of 50 and maximum of 200
+    adaptive_max = max(50, min(200, estimated_pairs))
+    # Round to nearest 10
+    adaptive_max = round(adaptive_max / 10) * 10
+    
+    # Apply user cap if provided (max_pairs is used as a cap, not absolute value)
+    # If max_pairs is None/0/negative, use adaptive only
+    if max_pairs is not None and max_pairs > 0:
+        if max_pairs < adaptive_max:
+            final_max = max_pairs
+            if progress_callback:
+                progress_callback(f"Adaptive max_pairs: {adaptive_max}, capped at {final_max} by user (based on {word_count} words, {total_chunks} chunks)")
+        else:
+            final_max = adaptive_max
+            if progress_callback:
+                progress_callback(f"Adaptive max_pairs set to {final_max} (user cap {max_pairs} not limiting, based on {word_count} words, {total_chunks} chunks)")
+    else:
+        final_max = adaptive_max
+        if progress_callback:
+            progress_callback(f"Adaptive max_pairs set to {final_max} based on {word_count} words and {total_chunks} chunks")
+    
+    max_pairs = final_max  # Update for use in rest of function
+    
     if progress_callback:
-        progress_callback(f"Found {total_chunks} chunks. Processing in parallel...")
+        progress_callback(f"Found {total_chunks} chunks. Target: {max_pairs} pairs. Processing in parallel...")
     
     def process_chunk(chunk_data: Tuple[str, str, int, int]) -> List[Dict]:
         """Process a single chunk and return reviewed pairs"""
@@ -323,7 +357,8 @@ def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_
                 current_produced = len(accepted_pairs)
             remaining_budget = max(0, max_pairs - current_produced)
             remaining_after_this = max(1, total - idx + 1)
-            cap_this_chunk = min(12, max(0, round(remaining_budget / remaining_after_this)))
+            # For 800-word chunks, aim for 15-20 pairs per chunk is reasonable
+            cap_this_chunk = min(20, max(0, round(remaining_budget / remaining_after_this)))
             candidate_pairs = generate_pairs_for_chunk(
                 chunk_text,
                 src_name,
@@ -332,6 +367,7 @@ def process_text_file(text_content: str, source_name: str, max_pairs: int = MAX_
                 total_target=max_pairs,
                 produced_so_far=current_produced,
                 remaining_chunks=remaining_after_this - 1,
+                chunk_idx=idx,
             )
             
             if not candidate_pairs:

@@ -1,12 +1,13 @@
-You will receive the FULL TEXT of a Malay history/archaeology/heritage document. Extract ONLY the title, abstract, and main content.
+You will receive the FULL TEXT of a Malay history/archaeology/heritage document. Extract ONLY the title, abstract, source (Sumber), and main content.
 
 KEEP:
 - TITLE (TAJUK): the article's title
 - ABSTRACT (ABSTRAK): if present, keep verbatim
+- SOURCE (SUMBER): the publication/journal source value ONLY (e.g., if you see "Sumber : Jurnal Antarabangsa Alam dan Tamadun Melayu (JATMA)", return only "Jurnal Antarabangsa Alam dan Tamadun Melayu (JATMA)")
 - MAIN CONTENT: ALL section headings (Pendahuluan, Kaedah, Hasil, Perbincangan, Kesimpulan, etc.) and their paragraphs
 
 DROP:
-- All metadata: Author, Date, Affiliation, Publisher, ISSN, DOI, Email, Phone, Address
+- All other metadata: Author, Date, Affiliation, Publisher, ISSN, DOI, Email, Phone, Address
 - Reference lists (Rujukan/Bibliografi)
 - Page numbers, headers, footers
 - Appendices, glossaries, table of contents
@@ -19,6 +20,9 @@ TITLE:
 
 ABSTRACT_BLOCK:
 <verbatim abstract text>
+
+SOURCE:
+<verbatim source (Sumber) if found, otherwise empty>
 
 BODY_BLOCK:
 <verbatim main body paragraphs>

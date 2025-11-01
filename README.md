@@ -37,7 +37,7 @@ The model I'm using is qwen/qwen3-30b-a3b:free. [link](https://openrouter.ai/qwe
 ## 3) Use on Localhost
 ### Web UI
 ```bash
-python3 qna_bm_web.py #or just run this file via IDE
+python3 web.py #or just run this file via IDE
 ```
 Open **http://localhost:8080** then:
 1. Wait for the API connection to verify, if it fails please check your API Key.

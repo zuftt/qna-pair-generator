@@ -9,7 +9,7 @@ import tempfile
 import threading
 import queue
 import time
-import qna_bm_core
+import core
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -35,7 +35,7 @@ def extract_clean_text():
 
         # Build user prompt per prefilter spec
         user_prompt = f"FULL TEXT:\n{full_text}\n\nReturn CLEAN_TEXT blocks as specified."
-        raw = qna_bm_core.chat(qna_bm_core.MODEL_GEN, qna_bm_core.PREFILTER_SYSTEM, user_prompt, temperature=0.0)
+        raw = core.chat(core.MODEL_GEN, core.PREFILTER_SYSTEM, user_prompt, temperature=0.0)
         # Simple parse of blocks
         title = ""; abstract = ""; body = ""
         def extract_block(label: str, text: str) -> str:
@@ -115,7 +115,7 @@ def generate_qa():
             
             try:
                 # Process the file with progress callback
-                pairs = qna_bm_core.process_text_file(
+                pairs = core.process_text_file(
                     file_content,
                     source_name,
                     max_pairs=max_pairs,
@@ -231,26 +231,26 @@ def download_csv():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Check if API is configured"""
-    has_config = bool(qna_bm_core.API_KEY and qna_bm_core.BASE_URL)
+    has_config = bool(core.API_KEY and core.BASE_URL)
     return jsonify({
         'configured': has_config,
-        'model_gen': qna_bm_core.MODEL_GEN,
-        'model_review': qna_bm_core.MODEL_REVIEW
+        'model_gen': core.MODEL_GEN,
+        'model_review': core.MODEL_REVIEW
     })
 
 @app.route('/api/verify-connection', methods=['GET'])
 def verify_connection():
     """Verify AI API connection by making a test call"""
     try:
-        if not qna_bm_core.API_KEY or not qna_bm_core.BASE_URL:
+        if not core.API_KEY or not core.BASE_URL:
             return jsonify({
                 'connected': False,
                 'error': 'API credentials not configured'
             })
         
         # Make a simple test call
-        test_response = qna_bm_core.chat(
-            qna_bm_core.MODEL_GEN,
+        test_response = core.chat(
+            core.MODEL_GEN,
             "You are a helpful assistant.",
             "Say 'OK' if you can read this.",
             temperature=0.1
@@ -259,7 +259,7 @@ def verify_connection():
         if test_response and len(test_response) > 0:
             return jsonify({
                 'connected': True,
-                'model': qna_bm_core.MODEL_GEN,
+                'model': core.MODEL_GEN,
                 'message': 'Successfully connected to AI API'
             })
         else:
@@ -284,7 +284,7 @@ def verify_connection():
 
 if __name__ == '__main__':
     # Check if API is configured
-    if not qna_bm_core.API_KEY or not qna_bm_core.BASE_URL:
+    if not core.API_KEY or not core.BASE_URL:
         print("\n" + "="*60)
         print("WARNING: API credentials not configured!")
         print("Please set OPENAI_API_KEY and OPENAI_BASE_URL in your .env file")

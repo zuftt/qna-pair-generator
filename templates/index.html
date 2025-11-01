@@ -152,6 +152,17 @@
             box-shadow: 0 5px 15px rgba(230, 126, 34, 0.4);
         }
 
+        .btn-reset {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-reset:hover:not(:disabled) {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(149, 165, 166, 0.4);
+        }
+
         .btn:disabled {
             background: #95a5a6;
             cursor: not-allowed;
@@ -190,6 +201,18 @@
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
+        }
+
+        @keyframes readyPulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        .ready-indicator {
+            display: inline-block;
+            margin-left: 8px;
+            color: #27ae60;
+            animation: readyPulse 2s ease-in-out infinite;
         }
 
         .results {
@@ -311,7 +334,9 @@
                     <span class="connection-status checking" id="connectionStatus">Checking...</span>
                 </h2>
                 <button class="btn btn-primary" id="generateBtn" disabled>Generate Q&A Pairs</button>
+                <button class="btn btn-primary" id="generateNextBtn" disabled style="display:none;">Generate More Pairs</button>
                 <button class="btn btn-secondary" id="downloadBtn" disabled>Download CSV</button>
+                <button class="btn btn-reset" id="resetBtn">Reset</button>
                 <div class="prefilter-panel" id="prefilterPanel" style="display:none;">
                     <h3>Prefilter Preview (used as context for the generator)</h3>
                     <div class="status" style="margin-bottom:6px; color:#7f8c8d;">
@@ -346,11 +371,14 @@
         let qaPairs = [];
         let fileInfo = {};
         let prefilterTitle = '';
+        let extractedData = {}; // Store extracted title, abstract, body, source_name for reuse
         
         const fileInput = document.getElementById('fileInput');
         const fileName = document.getElementById('fileName');
         const generateBtn = document.getElementById('generateBtn');
+        const generateNextBtn = document.getElementById('generateNextBtn');
         const downloadBtn = document.getElementById('downloadBtn');
+        const resetBtn = document.getElementById('resetBtn');
         const progress = document.getElementById('progress');
         const status = document.getElementById('status');
         const results = document.getElementById('results');
@@ -364,7 +392,14 @@
                 fileName.textContent = file.name;
                 if (connectionStatus.classList.contains('connected')) {
                     generateBtn.disabled = false;
+                    // Add ready indicator
+                    status.innerHTML = 'Ready to generate Q&A pairs <span class="ready-indicator">●</span>';
                 }
+                // Hide Generate Next button when new file is selected
+                generateNextBtn.style.display = 'none';
+                generateNextBtn.disabled = true;
+                extractedData = {}; // Clear extracted data
+                qaPairs = []; // Clear existing pairs
                 showAlert('File selected: ' + file.name, 'success');
             } else {
                 fileName.textContent = 'No file selected';
@@ -406,11 +441,18 @@
                     const fullContent = (pf.abstract ? pf.abstract + '\n\n' : '') + pf.body;
                     document.getElementById('prefBody').textContent = fullContent || '';
                     panel.style.display = 'block';
+                    // Store extracted data for reuse with Generate Next button
+                    extractedData = {
+                        title: pf.title || '',
+                        abstract: pf.abstract || '',
+                        body: pf.body || '',
+                        source_name: pf.source_name || (file ? file.name : 'uploaded.txt')
+                    };
                     // Attach CLEAN_TEXT blocks to generation form
-                    formData.append('title', pf.title || '');
-                    formData.append('abstract', pf.abstract || '');
-                    formData.append('body', pf.body || '');
-                    formData.append('source_name', pf.source_name || (file ? file.name : 'uploaded.txt'));
+                    formData.append('title', extractedData.title);
+                    formData.append('abstract', extractedData.abstract);
+                    formData.append('body', extractedData.body);
+                    formData.append('source_name', extractedData.source_name);
                 }
             } catch {}
 
@@ -457,6 +499,11 @@
                                 displayResults(qaPairs, fileInfo);
                                 showAlert(`Successfully generated ${data.count} Q&A pairs!`, 'success');
                                 downloadBtn.disabled = false;
+                                // Show and enable Generate Next button after successful generation
+                                if (Object.keys(extractedData).length > 0) {
+                                    generateNextBtn.style.display = 'inline-block';
+                                    generateNextBtn.disabled = false;
+                                }
                                 progressFill.style.width = '100%';
                                 setTimeout(() => {
                                     progress.classList.remove('active');
@@ -484,6 +531,106 @@
                 status.textContent = 'Error occurred during generation';
             } finally {
                 generateBtn.disabled = false;
+                generateNextBtn.disabled = false;
+            }
+        });
+
+        generateNextBtn.addEventListener('click', async () => {
+            if (Object.keys(extractedData).length === 0) {
+                showAlert('No extracted data available. Please generate first.', 'error');
+                return;
+            }
+
+            // Reset UI
+            generateNextBtn.disabled = true;
+            generateBtn.disabled = true;
+            downloadBtn.disabled = true;
+            progress.classList.add('active');
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = '0%';
+            status.textContent = 'Generating next batch...';
+
+            const genFormData = new FormData();
+            genFormData.append('title', extractedData.title);
+            genFormData.append('abstract', extractedData.abstract);
+            genFormData.append('body', extractedData.body);
+            genFormData.append('source_name', extractedData.source_name);
+            genFormData.append('max_pairs', maxPairsInput.value);
+            genFormData.append('skip_review', 'true');
+
+            // Use EventSource for live progress updates
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    body: genFormData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to start generation');
+                }
+
+                // Read stream for Server-Sent Events
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let currentPairs = [...qaPairs]; // Keep existing pairs for appending
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.slice(6));
+                            
+                            if (data.type === 'progress') {
+                                status.textContent = data.message;
+                                progressFill.style.width = '70%';
+                            } else if (data.type === 'complete') {
+                                // Append new pairs to existing ones
+                                const newPairs = data.pairs || [];
+                                qaPairs = [...currentPairs, ...newPairs];
+                                fileInfo = {
+                                    original_filename: data.original_filename,
+                                    file_size: data.file_size,
+                                    word_count: data.word_count,
+                                    pairs_generated: qaPairs.length
+                                };
+                                displayResults(qaPairs, fileInfo);
+                                showAlert(`Successfully generated ${newPairs.length} additional Q&A pairs! Total: ${qaPairs.length}`, 'success');
+                                downloadBtn.disabled = false;
+                                progressFill.style.width = '100%';
+                                setTimeout(() => {
+                                    progress.classList.remove('active');
+                                    progressFill.style.width = '0%';
+                                }, 1000);
+                                status.textContent = `Completed! Total Q&A pairs: ${qaPairs.length} (${newPairs.length} new).`;
+                            } else if (data.type === 'error') {
+                                let errorMsg = data.error || 'Unknown error';
+                                if (data.is_rate_limit) {
+                                    errorMsg = 'Rate limit exceeded. Please try again later or add credits to your account.';
+                                } else if (data.is_auth_error) {
+                                    errorMsg = 'Invalid API key. Please check your .env file.';
+                                }
+                                throw new Error(errorMsg);
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+                results.innerHTML = '<p style="color: #e74c3c;">Error generating Q&A pairs. Please try again.</p>';
+                progress.classList.remove('active');
+                progressFill.style.width = '0%';
+                status.textContent = 'Error occurred during generation';
+            } finally {
+                generateBtn.disabled = false;
+                generateNextBtn.disabled = false;
             }
         });
 
@@ -525,6 +672,39 @@
             } catch (error) {
                 showAlert('Error: ' + error.message, 'error');
             }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            // Clear all data and UI
+            qaPairs = [];
+            fileInfo = {};
+            prefilterTitle = '';
+            extractedData = {};
+            
+            // Reset file input
+            fileInput.value = '';
+            fileName.textContent = 'No file selected';
+            
+            // Reset buttons
+            generateBtn.disabled = true;
+            generateNextBtn.style.display = 'none';
+            generateNextBtn.disabled = true;
+            downloadBtn.disabled = true;
+            
+            // Reset UI elements
+            document.getElementById('prefilterPanel').style.display = 'none';
+            progress.classList.remove('active');
+            document.getElementById('progressFill').style.width = '0%';
+            results.innerHTML = '<p style="color: #7f8c8d; text-align: center; padding: 20px;">Upload a file and click "Generate Q&A Pairs" to get started</p>';
+            
+            // Reset status based on connection
+            if (connectionStatus.classList.contains('connected')) {
+                status.innerHTML = 'Ready to generate Q&A pairs <span class="ready-indicator">●</span>';
+            } else {
+                status.textContent = 'Ready to generate Q&A pairs';
+            }
+            
+            showAlert('All data reset. Ready to start fresh!', 'success');
         });
 
         function displayResults(pairs, fileInfo = {}) {
@@ -584,6 +764,10 @@
                 if (data.connected) {
                     connectionStatus.textContent = '✓ Connected';
                     connectionStatus.className = 'connection-status connected';
+                    // Add ready indicator to status when connected
+                    if (status.textContent === 'Ready to generate Q&A pairs') {
+                        status.innerHTML = 'Ready to generate Q&A pairs <span class="ready-indicator">●</span>';
+                    }
                 } else {
                     connectionStatus.textContent = '✗ Disconnected';
                     connectionStatus.className = 'connection-status disconnected';

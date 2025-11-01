@@ -327,6 +327,15 @@
                     <label for="maxPairs">Max Q&A Pairs:</label>
                     <input type="number" id="maxPairs" value="100" min="1" max="500" />
                 </div>
+                <div class="config-group" style="margin-top: 15px;">
+                    <label for="domain">Domain:</label>
+                    <select id="domain" style="padding: 8px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; width: 200px;">
+                        <option value="Sejarah" selected>Sejarah</option>
+                        <option value="Agama">Agama</option>
+                        <option value="Bahasa dan Linguistik">Bahasa dan Linguistik</option>
+                        <option value="Pendidikan">Pendidikan</option>
+                    </select>
+                </div>
             </div>
 
             <div class="section">
@@ -384,6 +393,7 @@
         const results = document.getElementById('results');
         const alert = document.getElementById('alert');
         const maxPairsInput = document.getElementById('maxPairs');
+        const domainInput = document.getElementById('domain');
         const connectionStatus = document.getElementById('connectionStatus');
 
         fileInput.addEventListener('change', (e) => {
@@ -417,6 +427,7 @@
             const formData = new FormData();
             formData.append('file', file);
             formData.append('max_pairs', maxPairsInput.value);
+            formData.append('domain', domainInput.value);
 
             // Reset UI
             qaPairs = [];
@@ -556,6 +567,7 @@
             genFormData.append('body', extractedData.body);
             genFormData.append('source_name', extractedData.source_name);
             genFormData.append('max_pairs', maxPairsInput.value);
+            genFormData.append('domain', domainInput.value);
             genFormData.append('skip_review', 'true');
 
             // Use EventSource for live progress updates
@@ -649,7 +661,8 @@
                     body: JSON.stringify({ 
                         pairs: qaPairs,
                         original_filename: fileInfo.original_filename || 'qa_bm_pairs',
-                        title: prefilterTitle || ''
+                        title: prefilterTitle || '',
+                        domain: domainInput.value
                     })
                 });
 

@@ -190,6 +190,7 @@ def download_csv():
         pairs = data.get('pairs', [])
         original_filename = data.get('original_filename', 'qa_bm_pairs')
         title = (data.get('title') or '').strip()
+        domain = data.get('domain', 'Sejarah').strip()
         
         if not pairs:
             return jsonify({'error': 'No data to export'}), 400
@@ -207,13 +208,14 @@ def download_csv():
         temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', newline='', encoding='utf-8')
         
         writer = csv.writer(temp_file)
-        # Write header (no References/Source column)
-        writer.writerow(['Question', 'Answer'])
+        # Write header with Domain column
+        writer.writerow(['Question', 'Answer', 'Domain'])
         # Write data
         for pair in pairs:
             writer.writerow([
                 pair.get('question',''),
-                pair.get('answer','')
+                pair.get('answer',''),
+                domain
             ])
         
         temp_file.close()

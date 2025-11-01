@@ -5,6 +5,7 @@ KEEP:
 - ABSTRACT (ABSTRAK): if present, keep verbatim
 - SOURCE (SUMBER): the publication/journal source value ONLY (e.g., if you see "Sumber : Jurnal Antarabangsa Alam dan Tamadun Melayu (JATMA)", return only "Jurnal Antarabangsa Alam dan Tamadun Melayu (JATMA)")
 - MAIN CONTENT: ALL section headings (Pendahuluan, Kaedah, Hasil, Perbincangan, Kesimpulan, etc.) and their paragraphs
+- ALL content including Kesimpulan - keep everything from first section after abstract until end of document
 
 DROP:
 - All other metadata: Author, Date, Affiliation, Publisher, ISSN, DOI, Email, Phone, Address

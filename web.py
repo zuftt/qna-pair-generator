@@ -262,18 +262,15 @@ def download_csv():
         for pair in pairs:
             # Use extracted source (Sumber) from document for Sumber column
             sumber_value = source if source else source_name
-            # Extract chunk number from pair's source (e.g., "filename.txt Chunk 2" -> "2")
-            chunk_num = ''
-            pair_source = pair.get('source', '')
-            if 'Chunk ' in pair_source:
-                chunk_num = pair_source.split('Chunk ')[1]
+            # Get full chunk text from pair
+            chunk_text = pair.get('chunk_text', '')
             writer.writerow([
                 pair.get('question',''),
                 pair.get('answer',''),
                 abstract,  # Same abstract for all pairs from same document
                 domain,    # Same domain for all pairs
                 sumber_value,  # Sumber - extracted from document
-                chunk_num  # Chunk number only
+                chunk_text  # Full chunk text
             ])
         
         temp_file.close()

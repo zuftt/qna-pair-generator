@@ -173,7 +173,7 @@ def generate_pairs_for_chunk(
         if q and a:
             # Use chunk reference if available
             src_label = f"{source_name} Chunk {chunk_idx}" if chunk_idx else source_name
-            pairs.append({"question": q, "answer": a, "source": src_label})
+            pairs.append({"question": q, "answer": a, "source": src_label, "chunk_text": chunk_text})
     # If a cap is supplied, enforce it
     if cap_this_chunk is not None and cap_this_chunk >= 0:
         return pairs[:cap_this_chunk]

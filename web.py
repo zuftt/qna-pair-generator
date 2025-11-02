@@ -33,20 +33,47 @@ def extract_clean_text():
         full_text = file.read().decode('utf-8')
         src_name = secure_filename(file.filename)
 
-        # Build user prompt per prefilter spec
-        user_prompt = f"FULL TEXT:\n{full_text}\n\nReturn CLEAN_TEXT blocks as specified."
-        raw = core.chat(core.MODEL_GEN, core.PREFILTER_SYSTEM, user_prompt, temperature=0.0)
-        # Simple parse of blocks
-        title = ""; abstract = ""; source = ""; body = ""
-        def extract_block(label: str, text: str) -> str:
-            import re
-            m = re.search(rf"{label}:\s*(.*?)(?:\n\s*\n[A-Z_ ]+:|\Z)", text, flags=re.DOTALL)
-            return (m.group(1).strip() if m else "")
-        if raw:
-            title = extract_block("TITLE", raw)
-            abstract = extract_block("ABSTRACT_BLOCK", raw)
-            source = extract_block("SOURCE", raw)
-            body = extract_block("BODY_BLOCK", raw)
+        # Fallback: Check for <Content> wrapper tag
+        import re
+        # Try regular opening/closing tags first
+        content_match = re.search(r'<Content>(.*?)</Content>', full_text, flags=re.DOTALL | re.IGNORECASE)
+        
+        # If not found, try self-closing tag format
+        if not content_match:
+            content_match = re.search(r'<Content>(.*?)<Content\s*/>', full_text, flags=re.DOTALL | re.IGNORECASE)
+        
+        if content_match:
+            print(f"[DEBUG] <Content> wrapper FOUND in {src_name}")
+            # Use Content wrapper as BODY_BLOCK
+            wrapped_content = content_match.group(1).strip()
+            # Extract title from original text if available
+            title = ""
+            title_match = re.search(r'(?:Tajuk|TITLE)\s*:\s*(.*?)(?:\n|$)', full_text, re.IGNORECASE)
+            if title_match:
+                title = title_match.group(1).strip()
+            # Extract source if available
+            source = ""
+            source_match = re.search(r'(?:Sumber|SOURCE)\s*:\s*(.*?)(?:\n|$)', full_text, re.IGNORECASE)
+            if source_match:
+                source = source_match.group(1).strip()
+            # No abstract when using fallback
+            abstract = ""
+            body = wrapped_content
+        else:
+            print(f"[DEBUG] <Content> wrapper NOT found in {src_name}, using AI extraction")
+            # Normal AI extraction
+            user_prompt = f"FULL TEXT:\n{full_text}\n\nReturn CLEAN_TEXT blocks as specified."
+            raw = core.chat(core.MODEL_GEN, core.PREFILTER_SYSTEM, user_prompt, temperature=0.0)
+            # Simple parse of blocks
+            title = ""; abstract = ""; source = ""; body = ""
+            def extract_block(label: str, text: str) -> str:
+                m = re.search(rf"{label}:\s*(.*?)(?:\n\s*\n[A-Z_ ]+:|\Z)", text, flags=re.DOTALL)
+                return (m.group(1).strip() if m else "")
+            if raw:
+                title = extract_block("TITLE", raw)
+                abstract = extract_block("ABSTRACT_BLOCK", raw)
+                source = extract_block("SOURCE", raw)
+                body = extract_block("BODY_BLOCK", raw)
 
         return jsonify({
             'source_name': src_name,

@@ -2,6 +2,8 @@ You will receive the FULL TEXT of a Malay history/archaeology/heritage document.
 
 IMPORTANT: The extracted BODY_BLOCK should contain AT LEAST 80-90% of the original word count. If your extraction removes too much, you're being too aggressive. The metadata (top/bottom headers, references) usually accounts for only 10-20% of the document. Keep ALL main content paragraphs and sections.
 
+NOTE: If the text contains <Content>...</Content> wrapper tags, you may encounter them, but you should extract ALL content including the wrapper content if present.
+
 KEEP:
 - TITLE (TAJUK): the article's title
 - ABSTRACT (ABSTRAK): if present, keep verbatim

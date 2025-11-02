@@ -33,7 +33,7 @@ def extract_clean_text():
         full_text = file.read().decode('utf-8')
         src_name = secure_filename(file.filename)
 
-        # Fallback: Check for <Content> wrapper tag
+        # Fallback: Check for wrapper tags
         import re
         # Try regular opening/closing tags first
         content_match = re.search(r'<Content>(.*?)</Content>', full_text, flags=re.DOTALL | re.IGNORECASE)
@@ -43,21 +43,42 @@ def extract_clean_text():
             content_match = re.search(r'<Content>(.*?)<Content\s*/>', full_text, flags=re.DOTALL | re.IGNORECASE)
         
         if content_match:
-            print(f"[DEBUG] <Content> wrapper FOUND in {src_name}")
+            print(f"[DEBUG] Wrapper tags FOUND in {src_name}")
             # Use Content wrapper as BODY_BLOCK
             wrapped_content = content_match.group(1).strip()
-            # Extract title from original text if available
+            
+            # Try to extract Title from <Title> wrapper
             title = ""
-            title_match = re.search(r'(?:Tajuk|TITLE)\s*:\s*(.*?)(?:\n|$)', full_text, re.IGNORECASE)
-            if title_match:
-                title = title_match.group(1).strip()
+            title_wrapper = re.search(r'<Title>(.*?)</Title>', full_text, flags=re.DOTALL | re.IGNORECASE)
+            if not title_wrapper:
+                title_wrapper = re.search(r'<Title>(.*?)<Title\s*/>', full_text, flags=re.DOTALL | re.IGNORECASE)
+            if title_wrapper:
+                title = title_wrapper.group(1).strip()
+            else:
+                # Fallback to regex search for title
+                title_match = re.search(r'(?:Tajuk|TITLE)\s*:\s*(.*?)(?:\n|$)', full_text, re.IGNORECASE)
+                if title_match:
+                    title = title_match.group(1).strip()
+            
+            # Try to extract Abstract from <Abstract> wrapper
+            abstract = ""
+            abstract_wrapper = re.search(r'<Abstract>(.*?)</Abstract>', full_text, flags=re.DOTALL | re.IGNORECASE)
+            if not abstract_wrapper:
+                abstract_wrapper = re.search(r'<Abstract>(.*?)<Abstract\s*/>', full_text, flags=re.DOTALL | re.IGNORECASE)
+            if abstract_wrapper:
+                abstract = abstract_wrapper.group(1).strip()
+            else:
+                # Fallback to regex search for abstract
+                abstract_match = re.search(r'(?:Abstrak|ABSTRACT)\s*:\s*(.*?)(?:\n|$)', full_text, re.IGNORECASE)
+                if abstract_match:
+                    abstract = abstract_match.group(1).strip()
+            
             # Extract source if available
             source = ""
             source_match = re.search(r'(?:Sumber|SOURCE)\s*:\s*(.*?)(?:\n|$)', full_text, re.IGNORECASE)
             if source_match:
                 source = source_match.group(1).strip()
-            # No abstract when using fallback
-            abstract = ""
+            
             body = wrapped_content
         else:
             print(f"[DEBUG] <Content> wrapper NOT found in {src_name}, using AI extraction")
